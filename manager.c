@@ -9,7 +9,7 @@ int main() {
     int fd;
     uint8_t buffer[7];  // ID + Werte + CRC
 
-    buffer[0] = 0xC3; // Sender ID
+    buffer[0] = 0xC2; // Sender ID
     buffer[1] = 0x01; // Wert ID 1
     buffer[2] = 1234 & 0xFF;
     buffer[3] = (1234 >> 8) & 0xFF;
