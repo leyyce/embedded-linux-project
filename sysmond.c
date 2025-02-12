@@ -98,7 +98,9 @@ int main() {
     struct timespec start, end;
 
     buffer[0] = 0xC2; // Sender ID
-
+    
+    sleep(1);
+    
     while (1) {
         clock_gettime(CLOCK_MONOTONIC, &start);  // Start time
         // Read from ready pipes
@@ -121,7 +123,7 @@ int main() {
 
         long elapsed = (end.tv_sec - start.tv_sec) * 1e9 + (end.tv_nsec - start.tv_nsec);
 
-        long wait_time = NUM_JOBS * 100 * 1e6 - elapsed;
+        long wait_time = (NUM_JOBS * 100) * 1e6 - elapsed;
 
         if (wait_time > 0) {
             struct timespec wait;
