@@ -12,6 +12,8 @@
 #include <time.h>
 
 #define NUM_JOBS 3
+#define NUM_SENDERS 4
+#define TIME_PER_JOB 25
 #define BUFFER_SIZE 1024
 #define DEVICE_FILE "/proc/monitoring-system"
 
@@ -22,7 +24,7 @@ const char *jobs[NUM_JOBS] = {
     "free | grep Mem | awk '{printf \"%dn\", $3 / $2 * 100}'", // Memory usage
 };
 
-void child_process(int write_fd, const char *command) {
+void child_process(int write_fd, int read_fd, const char *command) {
     // Parent collects output
     struct sched_param param;
     param.sched_priority = 98;  // Highest real-time priority
@@ -34,31 +36,47 @@ void child_process(int write_fd, const char *command) {
     }
 
     char buffer[BUFFER_SIZE];
+    uint8_t signal;
+    uint32_t val;
     FILE *fp;
 
     // Continuous execution loop
     while (1) {
+        signal = 0;
+
         // Execute command and open pipe to read its output
         fp = popen(command, "r");
         if (fp == NULL) {
-            write(write_fd, 0, sizeof(uint32_t));
+            val = 0;
+        }
+        else {
+            // Read command output and send to parent
+            fgets(buffer, BUFFER_SIZE, fp);
+            val = atoi(buffer);
         }
 
-        // Read command output and send to parent
-        fgets(buffer, BUFFER_SIZE, fp);
-        u_int32_t val = atoi(buffer);
-        write(write_fd, &val, sizeof(val));
-
+        ssize_t bytes_read = read(read_fd, &signal, sizeof(signal));
+        if (bytes_read > 0 && signal == 1) {
+            write(write_fd, &val, sizeof(val));
+        }
+        
         pclose(fp);
     }
 }
 
 int main() {
-    int pipes[NUM_JOBS][2];
+    int message_pipes[NUM_JOBS][2];
+    int signal_pipes[NUM_JOBS][2];
+
     pid_t pids[NUM_JOBS];
 
     for (int i = 0; i < NUM_JOBS; i++) {
-        if (pipe(pipes[i]) == -1) {
+        if (pipe(message_pipes[i]) == -1) {
+            perror("pipe failed");
+            exit(EXIT_FAILURE);
+        }
+
+        if (pipe(signal_pipes[i]) == -1) {
             perror("pipe failed");
             exit(EXIT_FAILURE);
         }
@@ -70,9 +88,14 @@ int main() {
         }
 
         if (pids[i] == 0) {  // Child process
-            child_process(pipes[i][1], jobs[i]);
+            close(message_pipes[i][0]);
+            close(signal_pipes[i][1]);
+            child_process(message_pipes[i][1], signal_pipes[i][0], jobs[i]);
             exit(EXIT_SUCCESS);
         }
+
+        close(message_pipes[i][1]);
+        close(signal_pipes[i][0]);
     }
 
     // Parent collects output
@@ -95,20 +118,32 @@ int main() {
 
     uint8_t buffer[1 + NUM_JOBS + 2 * NUM_JOBS];
     uint32_t val;
-    struct timespec start, end;
+    uint8_t one = 1;
 
     buffer[0] = 0xC2; // Sender ID
     
     sleep(1);
-    
+
+    struct timespec next;
+
     while (1) {
-        clock_gettime(CLOCK_MONOTONIC, &start);  // Start time
-        // Read from ready pipes
         int index = 1;
+
+        clock_gettime(CLOCK_MONOTONIC, &next);
+        next.tv_nsec += (NUM_JOBS * TIME_PER_JOB * NUM_SENDERS) * 1e6;
+        while (next.tv_nsec >= 1e9) {
+            next.tv_sec++;
+            next.tv_nsec -= 1e9;
+        }
+
         for (int i = 0; i < NUM_JOBS; i++) {
-            ssize_t bytes_read = read(pipes[i][0], &val, sizeof(val));
+            write(signal_pipes[i][1], &one, sizeof(one));
+        }
+
+        for (int i = 0; i < NUM_JOBS; i++) {
+            ssize_t bytes_read = read(message_pipes[i][0], &val, sizeof(val));
             if (bytes_read > 0) {
-                buffer[index] = i + 1; // Wert ID
+                buffer[index] = i; // Wert ID
                 buffer[index + 1] = val & 0xFF; // Wert LSB
                 buffer[index + 2] = (val >> 8) & 0xFF; // Wert MSB
             }
@@ -119,18 +154,7 @@ int main() {
             perror("Fehler beim Schreiben");
         }
 
-        clock_gettime(CLOCK_MONOTONIC, &end);  // End time
-
-        long elapsed = (end.tv_sec - start.tv_sec) * 1e9 + (end.tv_nsec - start.tv_nsec);
-
-        long wait_time = (NUM_JOBS * 100) * 1e6 - elapsed;
-
-        if (wait_time > 0) {
-            struct timespec wait;
-            wait.tv_sec = wait_time / 1e9;
-            wait.tv_nsec = wait_time % (long)1e9;
-            nanosleep(&wait, NULL);
-        }
+        clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &next, NULL);
     }
 
     // Should not reach here as children run infinitely
