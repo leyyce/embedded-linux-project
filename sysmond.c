@@ -1,3 +1,10 @@
+/*
+sysmond.c implementiert ein erweiterbares Monitoring System für verschiedene Messwerte und agiert nach der Initialisierung der GPIOs und dem Device Tree als Daemon im Hintergrund.
+Für jeden erhobenen Messwert wird ein Kindprozess vom Prozess abgespalten und zwei Pipes für bidirektionale Kommunikation erzeugt.
+Die Kindprozesse erheben ihre Messwerte und warten dann auf ein Signal des Elternprozesses um ihre Messdaten an diesen zu übermitteln.
+Der Elternprozess schreibt die Daten dann in das für die Kommunikation zwischen Userspace und Kernel genutzte Proc-File unter /proc/monitoring-system
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
