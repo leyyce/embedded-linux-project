@@ -84,3 +84,6 @@ WantedBy=multi-user.target
 ```
 
 Anschließend wird der Service mit `sudo systemctl enable --now sysmond` gestartet und der automatische Start beim Bootvorgang aktiviert.
+
+## Sicherstellung der Echtzeitfähigkeit
+Um die Echtzeitfähigkeit zu gewährleisten, haben wir den `6.1.0-31-rt-arm64` Kernel mit Realtime Funktionalität installiert. Ebenso setzen wir in unserem `sysmond` Prozess und seinen Kindern die entsprechenden Parameter, um die Prozesse mit Realtime Priorität zu behaften. Dabei setzen wir die Priorität des Elternprozesses auf 99 (max. Wert) um sicherzustellen, dass dieser immer Laufen darf wenn er bereit ist Daten zu verarbeiten oder zu senden. Die Kindprozesse werden mit dem Wert 98 versehen um eine unterbrechungsfreie Übertragung des Elternprozesses zu garantieren. 
