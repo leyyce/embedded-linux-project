@@ -3,7 +3,8 @@
 ## Architektur
 
 ### Übersicht der Architektur
-![Architektur](https://github.com/user-attachments/assets/7b9279e6-d6ab-4c74-b724-f2b07fe66139)
+![Architektur](https://github.com/user-attachments/assets/f4b9a00d-c1cc-47a1-89ff-5391cb528a4b)
+
 
 ### sysmond – Userspace Programm für Messungen
 Für jede Messung die vorgenommen werden soll, wird mittels `fork()` vom Elternprozess ein Kindprozess abgespalten. Der Elternprozess übernimmt dabei die Aufgabe der Kommunikation mit dem Kernelmodul und sorgt für die Aggregation der Daten, während die Kindprozesse die Messungen ausführen und die ermittelten Werte an den Elternprozess zurück übermitteln.
@@ -52,6 +53,9 @@ Ein Datenframe welcher über MSD übermittelt wird, ist wie folgt aufgebaut:
 Für die Werte-IDs verwenden wir einen nicht vorzeichenbehafteten 8-bit Integer, mit diesem lassen sich 256 Werte (Werte-ID 0 - 255) darstellen. Somit ist es unserem System tendenziell möglich 256 verschiedene Werte zu überwache.
 
 Die Werte selbst werden als nicht vorzeichenbehafteten 16-bit Integer übertragen.
+
+### Timing
+![Timing](https://github.com/user-attachments/assets/e4879aa5-87c6-4aef-a7eb-ba1d2a7bb23c)
 
 ## Automatischer Start der Überwachung und Übertragung bei Systemstart
 Um die automatische Überwachung bei Systemstart zu realisieren haben wir das System so eingestellt, dass das Kernel Modul beim Boot automatisch geladen wird und somit zur Kommunikation mit dem Datenbus zur Verfügung steht. Dafür wurde das Modul File `system_monitor.ko` in den entsprechenden Ordner unter `/lib/modules/$(uname -r)/` kopiert, und ein entsprechender Eintrag `monitoring_system` in der Datei `/etc/modules` angelegt.
